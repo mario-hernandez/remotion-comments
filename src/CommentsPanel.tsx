@@ -168,9 +168,16 @@ export const CommentsPanel: React.FC<Props> = ({
         }}
       />
 
-      {/* Pines visibles cuando playhead está cerca de su atSec */}
+      {/* Pines visibles cuando playhead está cerca de su atSec
+          (los resueltos no se muestran sobre el preview) */}
       {myComments
-        .filter((c) => c.posX !== undefined && c.posY !== undefined && isActive(c))
+        .filter(
+          (c) =>
+            c.posX !== undefined &&
+            c.posY !== undefined &&
+            isActive(c) &&
+            !c.resolvedAt,
+        )
         .map((c) => (
           <div
             key={c.id}

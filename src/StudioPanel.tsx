@@ -18,10 +18,13 @@ const formatTime = (s: number) => {
   return `${m}:${sec.padStart(4, "0")}`;
 };
 
+type Filter = "pending" | "resolved" | "all";
+
 const StudioPanel: React.FC = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [filter, setFilter] = useState<Filter>("pending");
   const editRef = useRef<HTMLTextAreaElement | null>(null);
 
   const refresh = useCallback(async () => {
@@ -68,6 +71,23 @@ const StudioPanel: React.FC = () => {
 
   const remove = useCallback(
     (id: string) => persist(comments.filter((c) => c.id !== id)),
+    [comments, persist]
+  );
+
+  const toggleResolved = useCallback(
+    async (c: Comment) => {
+      const now = Math.floor(Date.now() / 1000);
+      const next = comments.map((x) => {
+        if (x.id !== c.id) return x;
+        if (c.resolvedAt) {
+          // unresolve: strip resolvedAt + resolvedNote
+          const { resolvedAt: _r, resolvedNote: _n, ...rest } = x;
+          return { ...rest, updatedAt: now };
+        }
+        return { ...x, resolvedAt: now, updatedAt: now };
+      });
+      await persist(next);
+    },
     [comments, persist]
   );
 
@@ -125,9 +145,16 @@ const StudioPanel: React.FC = () => {
     }
   }, []);
 
-  // Group by composition
+  const matchesFilter = (c: Comment) => {
+    if (filter === "all") return true;
+    if (filter === "pending") return !c.resolvedAt;
+    return Boolean(c.resolvedAt);
+  };
+
+  // Group by composition (after filter)
   const byComp: Record<string, Comment[]> = {};
   for (const c of comments) {
+    if (!matchesFilter(c)) continue;
     if (!byComp[c.compositionId]) byComp[c.compositionId] = [];
     byComp[c.compositionId].push(c);
   }
@@ -136,6 +163,9 @@ const StudioPanel: React.FC = () => {
   }
 
   const totalCount = comments.length;
+  const pendingCount = comments.filter((c) => !c.resolvedAt).length;
+  const resolvedCount = totalCount - pendingCount;
+  const filteredCount = Object.values(byComp).reduce((a, b) => a + b.length, 0);
 
   return (
     <div
@@ -153,9 +183,7 @@ const StudioPanel: React.FC = () => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: 12,
-          paddingBottom: 10,
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          marginBottom: 8,
         }}
       >
         <div
@@ -171,6 +199,49 @@ const StudioPanel: React.FC = () => {
         <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>
           public/{COMMENTS_FILE}
         </div>
+      </div>
+
+      {/* Filter pills */}
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          marginBottom: 12,
+          paddingBottom: 10,
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        {(
+          [
+            ["pending", "Pending", pendingCount],
+            ["resolved", "Resolved", resolvedCount],
+            ["all", "All", totalCount],
+          ] as const
+        ).map(([key, label, count]) => {
+          const isActive = filter === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              style={{
+                background: isActive
+                  ? "rgba(165, 180, 252, 0.18)"
+                  : "rgba(255,255,255,0.04)",
+                border: `1px solid ${isActive ? "rgba(165, 180, 252, 0.5)" : "rgba(255,255,255,0.08)"}`,
+                color: isActive ? "#A5B4FC" : "rgba(255,255,255,0.55)",
+                padding: "3px 10px",
+                borderRadius: 999,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.05em",
+              }}
+            >
+              {label} <span style={{ opacity: 0.6, marginLeft: 2 }}>{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {totalCount === 0 ? (
@@ -195,6 +266,17 @@ const StudioPanel: React.FC = () => {
             C
           </kbd>{" "}
           on the preview to drop a pin.
+        </div>
+      ) : filteredCount === 0 ? (
+        <div
+          style={{
+            color: "rgba(255,255,255,0.4)",
+            fontStyle: "italic",
+            padding: "24px 12px",
+            textAlign: "center",
+          }}
+        >
+          No {filter} comments.
         </div>
       ) : (
         Object.entries(byComp).map(([compId, list]) => (
@@ -226,22 +308,28 @@ const StudioPanel: React.FC = () => {
             </div>
             {list.map((c) => {
               const isEditing = editingId === c.id;
+              const isResolved = Boolean(c.resolvedAt);
               return (
                 <div
                   key={c.id}
                   style={{
                     background: isEditing
                       ? "rgba(165, 180, 252, 0.08)"
-                      : "rgba(255,255,255,0.03)",
+                      : isResolved
+                        ? "rgba(110, 207, 156, 0.04)"
+                        : "rgba(255,255,255,0.03)",
                     border: `1px solid ${
                       isEditing
                         ? "rgba(165, 180, 252, 0.5)"
-                        : "rgba(165, 180, 252, 0.18)"
+                        : isResolved
+                          ? "rgba(110, 207, 156, 0.25)"
+                          : "rgba(165, 180, 252, 0.18)"
                     }`,
                     borderRadius: 8,
                     padding: 10,
                     marginBottom: 6,
                     cursor: isEditing ? "default" : "pointer",
+                    opacity: isResolved ? 0.7 : 1,
                   }}
                   onClick={() => {
                     if (!isEditing) seekTo(c);
@@ -291,6 +379,26 @@ const StudioPanel: React.FC = () => {
                       )}
                     </span>
                     <div style={{ display: "flex", gap: 6 }}>
+                      {!isEditing && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleResolved(c);
+                          }}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: isResolved ? "#6ECF9C" : "rgba(255,255,255,0.45)",
+                            cursor: "pointer",
+                            fontSize: 13,
+                            padding: 0,
+                            lineHeight: 1,
+                          }}
+                          title={isResolved ? "Reopen" : "Mark resolved"}
+                        >
+                          {isResolved ? "✓" : "○"}
+                        </button>
+                      )}
                       {!isEditing && (
                         <button
                           onClick={(e) => {
@@ -401,15 +509,34 @@ const StudioPanel: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    <div
-                      style={{
-                        fontSize: 12,
-                        lineHeight: 1.4,
-                        color: "rgba(255,255,255,0.85)",
-                      }}
-                    >
-                      {c.text}
-                    </div>
+                    <>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          lineHeight: 1.4,
+                          color: "rgba(255,255,255,0.85)",
+                          textDecoration: isResolved ? "line-through" : "none",
+                          textDecorationColor: "rgba(110, 207, 156, 0.5)",
+                        }}
+                      >
+                        {c.text}
+                      </div>
+                      {isResolved && c.resolvedNote && (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            paddingTop: 6,
+                            borderTop: "1px dashed rgba(110, 207, 156, 0.18)",
+                            fontSize: 11,
+                            lineHeight: 1.4,
+                            color: "#6ECF9C",
+                            fontStyle: "italic",
+                          }}
+                        >
+                          ✓ {c.resolvedNote}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               );

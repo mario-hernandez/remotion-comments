@@ -27,7 +27,19 @@ export interface UseCommentsResult {
     fps?: number;
   }) => Promise<Comment>;
   /** Update text (and other mutable fields) of an existing comment. */
-  update: (id: string, patch: { text?: string }) => Promise<void>;
+  update: (
+    id: string,
+    patch: {
+      text?: string;
+      resolvedAt?: number;
+      resolvedNote?: string;
+    },
+  ) => Promise<void>;
+  /** Mark a comment as resolved with an optional note explaining what was
+   * fixed. Idempotent: re-resolving updates the timestamp & note. */
+  resolve: (id: string, note?: string) => Promise<void>;
+  /** Re-open a previously resolved comment. */
+  unresolve: (id: string) => Promise<void>;
   /** Remove a single comment by id. */
   remove: (id: string) => Promise<void>;
   /** Force a re-read from disk. Usually not needed — `watchStaticFile` keeps
@@ -127,6 +139,35 @@ export const useComments = (config: CommentsConfig = {}): UseCommentsResult => {
     [comments, persist]
   );
 
+  const resolve = useCallback<UseCommentsResult["resolve"]>(
+    async (id: string, note?: string) => {
+      const next = comments.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              resolvedAt: Math.floor(Date.now() / 1000),
+              ...(note !== undefined ? { resolvedNote: note } : {}),
+              updatedAt: Math.floor(Date.now() / 1000),
+            }
+          : c,
+      );
+      await persist(next);
+    },
+    [comments, persist]
+  );
+
+  const unresolve = useCallback<UseCommentsResult["unresolve"]>(
+    async (id: string) => {
+      const next = comments.map((c) => {
+        if (c.id !== id) return c;
+        const { resolvedAt: _r, resolvedNote: _n, ...rest } = c;
+        return { ...rest, updatedAt: Math.floor(Date.now() / 1000) };
+      });
+      await persist(next);
+    },
+    [comments, persist]
+  );
+
   const remove = useCallback<UseCommentsResult["remove"]>(
     async (id: string) => {
       await persist(comments.filter((c) => c.id !== id));
@@ -142,5 +183,5 @@ export const useComments = (config: CommentsConfig = {}): UseCommentsResult => {
     [comments]
   );
 
-  return { comments, add, update, remove, refresh, byComposition };
+  return { comments, add, update, resolve, unresolve, remove, refresh, byComposition };
 };

@@ -20,6 +20,13 @@ export interface Comment {
   createdAt: number;
   /** Unix timestamp in seconds of the last edit. Absent if never edited. */
   updatedAt?: number;
+  /** Unix timestamp in seconds when the comment was marked as resolved.
+   * Resolved comments stay in the JSON for history but are visually muted
+   * (struck-through, faded) and can be filtered out from the panel. */
+  resolvedAt?: number;
+  /** Free-form note explaining how/why the comment was resolved. Useful for
+   * auditing what an AI agent or developer actually changed in response. */
+  resolvedNote?: string;
 }
 
 export interface CommentsConfig {

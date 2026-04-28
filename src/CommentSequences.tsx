@@ -8,10 +8,14 @@ interface Props extends CommentsConfig {
   compositionId: string;
   /** Composition fps. Used to convert seconds → frames */
   fps: number;
-  /** Optional emoji prefix for clip names. Default: "💬 " */
+  /** Optional emoji prefix for unresolved clip names. Default: "💬 " */
   emoji?: string;
+  /** Optional emoji prefix for resolved clip names. Default: "✓ " */
+  resolvedEmoji?: string;
   /** Maximum length of comment text shown in the clip name. Default: 40 */
   truncateAt?: number;
+  /** Hide resolved comments from the timeline track. Default: false (show all) */
+  hideResolved?: boolean;
 }
 
 const Empty: React.FC = () => null;
@@ -35,7 +39,9 @@ export const CommentSequences: React.FC<Props> = ({
   compositionId,
   fps,
   emoji = "💬 ",
+  resolvedEmoji = "✓ ",
   truncateAt = 40,
+  hideResolved = false,
   filePath,
   lifetimeSec = DEFAULT_LIFETIME_SEC,
 }) => {
@@ -48,23 +54,26 @@ export const CommentSequences: React.FC<Props> = ({
 
   return (
     <>
-      {myComments.map((c) => {
-        const truncated =
-          c.text.length > truncateAt
-            ? c.text.slice(0, truncateAt - 1) + "…"
-            : c.text;
-        return (
-          <Sequence
-            key={c.id}
-            from={Math.round(c.atSec * fps)}
-            durationInFrames={Math.round(lifetimeSec * fps)}
-            name={`${emoji}${truncated}`}
-            layout="absolute-fill"
-          >
-            <Empty />
-          </Sequence>
-        );
-      })}
+      {myComments
+        .filter((c) => !(hideResolved && c.resolvedAt))
+        .map((c) => {
+          const truncated =
+            c.text.length > truncateAt
+              ? c.text.slice(0, truncateAt - 1) + "…"
+              : c.text;
+          const prefix = c.resolvedAt ? resolvedEmoji : emoji;
+          return (
+            <Sequence
+              key={c.id}
+              from={Math.round(c.atSec * fps)}
+              durationInFrames={Math.round(lifetimeSec * fps)}
+              name={`${prefix}${truncated}`}
+              layout="absolute-fill"
+            >
+              <Empty />
+            </Sequence>
+          );
+        })}
     </>
   );
 };
