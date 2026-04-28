@@ -5,7 +5,7 @@ import {
   Comment,
   CommentsConfig,
   DEFAULT_FILE_PATH,
-} from "./types";
+} from "./types.js";
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 
@@ -21,7 +21,13 @@ export interface UseCommentsResult {
     posX?: number;
     /** Optional spatial anchor (% of composition height). */
     posY?: number;
+    /** FPS of the composition. Persisted so the sidebar can compute the
+     * correct `seek(frame)` even if compositions in the same project have
+     * different fps. */
+    fps?: number;
   }) => Promise<Comment>;
+  /** Update text (and other mutable fields) of an existing comment. */
+  update: (id: string, patch: { text?: string }) => Promise<void>;
   /** Remove a single comment by id. */
   remove: (id: string) => Promise<void>;
   /** Force a re-read from disk. Usually not needed — `watchStaticFile` keeps
@@ -54,12 +60,22 @@ export const useComments = (config: CommentsConfig = {}): UseCommentsResult => {
     if (getRemotionEnvironment().isRendering) return;
     try {
       const r = await fetch(`${staticFile(filePath)}?t=${Date.now()}`);
-      if (r.ok) {
-        const text = await r.text();
-        if (text.trim()) setComments(JSON.parse(text));
+      if (!r.ok) {
+        // file may not exist yet
+        setComments([]);
+        return;
       }
-    } catch {
-      // file might not exist yet → empty list
+      const text = await r.text();
+      if (!text.trim()) {
+        setComments([]);
+        return;
+      }
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) setComments(parsed);
+    } catch (err) {
+      // log but don't crash
+      // eslint-disable-next-line no-console
+      console.warn("[remotion-comments] could not load", filePath, err);
     }
   }, [filePath]);
 
@@ -82,7 +98,7 @@ export const useComments = (config: CommentsConfig = {}): UseCommentsResult => {
   );
 
   const add = useCallback<UseCommentsResult["add"]>(
-    async ({ compositionId, atSec, text, posX, posY }) => {
+    async ({ compositionId, atSec, text, posX, posY, fps }) => {
       const c: Comment = {
         id: newId(),
         compositionId,
@@ -91,9 +107,22 @@ export const useComments = (config: CommentsConfig = {}): UseCommentsResult => {
         createdAt: Math.floor(Date.now() / 1000),
         ...(posX !== undefined ? { posX } : {}),
         ...(posY !== undefined ? { posY } : {}),
+        ...(fps !== undefined ? { fps } : {}),
       };
       await persist([...comments, c]);
       return c;
+    },
+    [comments, persist]
+  );
+
+  const update = useCallback<UseCommentsResult["update"]>(
+    async (id, patch) => {
+      const next = comments.map((c) =>
+        c.id === id
+          ? { ...c, ...patch, updatedAt: Math.floor(Date.now() / 1000) }
+          : c,
+      );
+      await persist(next);
     },
     [comments, persist]
   );
@@ -113,5 +142,5 @@ export const useComments = (config: CommentsConfig = {}): UseCommentsResult => {
     [comments]
   );
 
-  return { comments, add, remove, refresh, byComposition };
+  return { comments, add, update, remove, refresh, byComposition };
 };

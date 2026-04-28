@@ -11,10 +11,15 @@ export interface Comment {
    * (0 = top, 100 = bottom). `undefined` if the comment is not spatially
    * anchored. */
   posY?: number;
+  /** FPS of the composition the comment was created in. Used by the sidebar
+   * panel to compute the right `seek(frame)` for jumps. */
+  fps?: number;
   /** Free-form text. Can include @mentions, markdown, anything */
   text: string;
   /** Unix timestamp in seconds when the comment was created */
   createdAt: number;
+  /** Unix timestamp in seconds of the last edit. Absent if never edited. */
+  updatedAt?: number;
 }
 
 export interface CommentsConfig {

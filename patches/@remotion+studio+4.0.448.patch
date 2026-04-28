@@ -1,0 +1,23 @@
+diff --git a/node_modules/@remotion/studio/dist/components/OptionsPanel.js b/node_modules/@remotion/studio/dist/components/OptionsPanel.js
+index 82e75bc..08d8c87 100644
+--- a/node_modules/@remotion/studio/dist/components/OptionsPanel.js
++++ b/node_modules/@remotion/studio/dist/components/OptionsPanel.js
+@@ -63,6 +63,10 @@ const OptionsPanel = ({ readOnlyStudio }) => {
+         setPanel('renders');
+         (0, exports.persistSelectedOptionsSidebarPanel)('renders');
+     }, []);
++    const onCommentsSelected = (0, react_1.useCallback)(() => {
++        setPanel('comments');
++        (0, exports.persistSelectedOptionsSidebarPanel)('comments');
++    }, []);
+     const onVisualControlsSelected = (0, react_1.useCallback)(() => {
+         setPanel('visual-controls');
+         (0, exports.persistSelectedOptionsSidebarPanel)('visual-controls');
+@@ -182,6 +186,6 @@ const OptionsPanel = ({ readOnlyStudio }) => {
+         }
+     }, [compositionId, compositionDefaultProps, saveToFile, updateProps]);
+     return (jsx_runtime_1.jsxs("div", { style: container, className: "css-reset", children: [
+-            jsx_runtime_1.jsx("div", { style: tabsContainer, children: jsx_runtime_1.jsxs(Tabs_1.Tabs, { children: [visualControlsTabActivated ? (jsx_runtime_1.jsx(Tabs_1.Tab, { selected: panel === 'visual-controls', onClick: onVisualControlsSelected, children: "Controls" })) : null, jsx_runtime_1.jsxs(Tabs_1.Tab, { selected: panel === 'input-props', onClick: onPropsSelected, style: { justifyContent: 'space-between' }, children: ["Props", hasLocalModifications ? (jsx_runtime_1.jsx(SchemaResetButton_1.SchemaResetButton, { onClick: resetToOriginal })) : null] }), renderingAvailable ? (jsx_runtime_1.jsx(RendersTab_1.RendersTab, { onClick: onRendersSelected, selected: panel === 'renders' })) : null] }) }), panel === 'input-props' ? (composition ? (jsx_runtime_1.jsx(DefaultPropsEditor_1.DefaultPropsEditor, { unresolvedComposition: composition, defaultProps: currentDefaultProps, setDefaultProps: setDefaultProps, propsEditType: "default-props" }, composition.id)) : null) : panel === 'visual-controls' && visualControlsTabActivated ? (jsx_runtime_1.jsx(VisualControlsContent_1.VisualControlsContent, {})) : !renderingAvailable ? null : (jsx_runtime_1.jsx(RenderQueue_1.RenderQueue, {}))] }));
++            jsx_runtime_1.jsx("div", { style: tabsContainer, children: jsx_runtime_1.jsxs(Tabs_1.Tabs, { children: [visualControlsTabActivated ? (jsx_runtime_1.jsx(Tabs_1.Tab, { selected: panel === 'visual-controls', onClick: onVisualControlsSelected, children: "Controls" })) : null, jsx_runtime_1.jsxs(Tabs_1.Tab, { selected: panel === 'input-props', onClick: onPropsSelected, style: { justifyContent: 'space-between' }, children: ["Props", hasLocalModifications ? (jsx_runtime_1.jsx(SchemaResetButton_1.SchemaResetButton, { onClick: resetToOriginal })) : null] }), renderingAvailable ? (jsx_runtime_1.jsx(RendersTab_1.RendersTab, { onClick: onRendersSelected, selected: panel === 'renders' })) : null, jsx_runtime_1.jsx(Tabs_1.Tab, { selected: panel === 'comments', onClick: onCommentsSelected, children: "Comments" })] }) }), panel === 'comments' ? (() => { const Cmp = (typeof window !== 'undefined' && window.__remotionStudioPanels__ && window.__remotionStudioPanels__.comments) || null; return Cmp ? jsx_runtime_1.jsx(Cmp, {}) : jsx_runtime_1.jsx("div", { style: { padding: 16, color: "#999", fontSize: 13 }, children: "No comments panel registered. Import `remotion-comments` to enable." }); })() : panel === 'input-props' ? (composition ? (jsx_runtime_1.jsx(DefaultPropsEditor_1.DefaultPropsEditor, { unresolvedComposition: composition, defaultProps: currentDefaultProps, setDefaultProps: setDefaultProps, propsEditType: "default-props" }, composition.id)) : null) : panel === 'visual-controls' && visualControlsTabActivated ? (jsx_runtime_1.jsx(VisualControlsContent_1.VisualControlsContent, {})) : !renderingAvailable ? null : (jsx_runtime_1.jsx(RenderQueue_1.RenderQueue, {}))] }));
+ };
+ exports.OptionsPanel = OptionsPanel;

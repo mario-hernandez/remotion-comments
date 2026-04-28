@@ -1,7 +1,7 @@
 import React from "react";
 import { Sequence, getRemotionEnvironment } from "remotion";
-import { useComments } from "./useComments";
-import { CommentsConfig, DEFAULT_LIFETIME_SEC } from "./types";
+import { useComments } from "./useComments.js";
+import { CommentsConfig, DEFAULT_LIFETIME_SEC } from "./types.js";
 
 interface Props extends CommentsConfig {
   /** Composition id this track belongs to */
@@ -40,10 +40,11 @@ export const CommentSequences: React.FC<Props> = ({
   lifetimeSec = DEFAULT_LIFETIME_SEC,
 }) => {
   const { byComposition } = useComments({ filePath, lifetimeSec });
-
-  if (getRemotionEnvironment().isRendering) return null;
-
+  const isRendering = getRemotionEnvironment().isRendering;
   const myComments = byComposition(compositionId);
+
+  // Skip during render — comments must NOT appear in the final video.
+  if (isRendering) return null;
 
   return (
     <>

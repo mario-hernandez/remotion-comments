@@ -5,25 +5,21 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { useComments } from "./useComments";
-import { Comment, CommentsConfig, DEFAULT_LIFETIME_SEC } from "./types";
+import { useComments } from "./useComments.js";
+import { Comment, CommentsConfig, DEFAULT_LIFETIME_SEC } from "./types.js";
 
 interface Props extends CommentsConfig {
   compositionId: string;
-  /** SCALE multiplier so the panel renders well at typical 25% Studio zoom on
-   * 4K compositions. Default: 4. Use 1 for 1080p compositions, 2 for 2K. */
+  /** Multiplier so the panel renders well at typical 25% Studio zoom on 4K
+   * compositions. Default: 4. Use 1 for 1080p, 2 for 2K. */
   scale?: number;
-  /** Hide the floating "click to comment" indicator after this many ms of
-   * inactivity. Default: 2000. Set to 0 to keep visible always. */
+  /** Hide the floating indicator after this many ms of inactivity. Default
+   * 2000. Set to 0 to keep visible always. */
   autoHideMs?: number;
-  /** Keyboard shortcut to open the form at the playhead (no spatial anchor).
-   * Default: "c" */
+  /** Keyboard shortcut to enter pinning mode. Default: "c" */
   shortcut?: string;
-  /** i18n */
-  hintText?: string;
   /** When the playhead passes within this many seconds of a pin's anchor, the
-   * pin is highlighted. Default: 2 (also doubles as Sequence clip duration in
-   * `<CommentSequences/>`). */
+   * pin is shown. Default: 2. */
   lifetimeSec?: number;
 }
 
@@ -33,40 +29,26 @@ const formatTime = (s: number) => {
   return `${m}:${sec.padStart(4, "0")}`;
 };
 
-/**
- * Floating UI rendered inside a Remotion composition that lets the reviewer:
- *
- * 1. **Click anywhere on the preview** → drops a pin at exact `(posX%, posY%)`
- *    of the frame, anchored to the current frame in time.
- * 2. **Press `C`** → drops a pin without spatial anchor (just the timestamp).
- *
- * Pins are visible on top of the preview when the playhead is within
- * `lifetimeSec` of their anchor, so you see at a glance what feedback was
- * left on the part of the video you're watching.
- *
- * The panel is hidden during render. Pair with `<CommentSequences/>` to also
- * see the comments as named clips on the official Studio timeline.
- */
 export const CommentsPanel: React.FC<Props> = ({
   compositionId,
   scale = 4,
   autoHideMs = 2000,
   shortcut = "c",
-  hintText = "Click on the preview or press",
   filePath,
   lifetimeSec = DEFAULT_LIFETIME_SEC,
 }) => {
-  if (getRemotionEnvironment().isRendering) return null;
-
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const atSec = frame / fps;
+  const isRendering = getRemotionEnvironment().isRendering;
 
   const px = (n: number) => n * scale;
 
   const { comments, add, remove } = useComments({ filePath });
 
   const [open, setOpen] = useState(false);
+  /** Pinning mode: when true, clicks on the preview drop a pin */
+  const [pinning, setPinning] = useState(false);
   const [formText, setFormText] = useState("");
   const [formAt, setFormAt] = useState<{
     atSec: number;
@@ -75,7 +57,7 @@ export const CommentsPanel: React.FC<Props> = ({
   }>({ atSec: 0 });
   const [visible, setVisible] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const catcherRef = useRef<HTMLDivElement | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-hide indicator
@@ -88,7 +70,7 @@ export const CommentsPanel: React.FC<Props> = ({
       setVisible(true);
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
       hideTimerRef.current = setTimeout(() => {
-        if (!open) setVisible(false);
+        if (!open && !pinning) setVisible(false);
       }, autoHideMs);
     };
     reset();
@@ -99,32 +81,37 @@ export const CommentsPanel: React.FC<Props> = ({
       window.removeEventListener("keydown", reset);
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     };
-  }, [open, autoHideMs]);
+  }, [open, pinning, autoHideMs]);
 
-  // Keyboard shortcut: open form at playhead, NO spatial anchor
+  // Keyboard: shortcut → enter pinning mode. Esc → cancel pinning or form.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "TEXTAREA" || tag === "INPUT") return;
       if (e.key.toLowerCase() === shortcut.toLowerCase()) {
         e.preventDefault();
-        setFormAt({ atSec });
-        setOpen(true);
-        setTimeout(() => textareaRef.current?.focus(), 50);
+        setPinning(true);
+      } else if (e.key === "Escape") {
+        if (pinning) {
+          setPinning(false);
+        } else if (open) {
+          setOpen(false);
+        }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [atSec, shortcut]);
+  }, [shortcut, pinning, open]);
 
-  // Click on the preview → drop pin at (x%, y%, atSec)
-  const onPreviewClick = (e: React.MouseEvent) => {
-    if (open) return;
-    const rect = containerRef.current?.getBoundingClientRect();
+  // Click in pinning mode → drop pin at (x%, y%, atSec) and open form
+  const onCatcherClick = (e: React.MouseEvent) => {
+    if (!pinning) return;
+    const rect = catcherRef.current?.getBoundingClientRect();
     if (!rect) return;
     const posX = ((e.clientX - rect.left) / rect.width) * 100;
     const posY = ((e.clientY - rect.top) / rect.height) * 100;
     setFormAt({ atSec, posX, posY });
+    setPinning(false);
     setOpen(true);
     setTimeout(() => textareaRef.current?.focus(), 50);
   };
@@ -132,7 +119,7 @@ export const CommentsPanel: React.FC<Props> = ({
   const submit = async () => {
     const text = formText.trim();
     if (!text) return;
-    await add({ compositionId, ...formAt, text });
+    await add({ compositionId, ...formAt, text, fps });
     setFormText("");
     setOpen(false);
   };
@@ -149,28 +136,31 @@ export const CommentsPanel: React.FC<Props> = ({
   };
 
   const myComments = comments.filter((c) => c.compositionId === compositionId);
-
-  // A pin is "active" when the playhead is within lifetimeSec of its atSec.
   const isActive = (c: Comment) =>
     atSec >= c.atSec && atSec - c.atSec < lifetimeSec;
 
-  const showIndicator = visible || open;
+  const showIndicator = visible || open || pinning;
+
+  // Hide all UI during render — but AFTER all hooks have run (rules-of-hooks).
+  if (isRendering) return null;
 
   return (
     <AbsoluteFill style={{ pointerEvents: "none", zIndex: 9999 }}>
-      {/* Click-catcher layer. Only enabled when form is closed. */}
+      {/* Click-catcher: SOLO interactivo en modo pinning (no rompe nada en reposo) */}
       <div
-        ref={containerRef}
-        onClick={onPreviewClick}
+        ref={catcherRef}
+        onClick={onCatcherClick}
         style={{
           position: "absolute",
           inset: 0,
-          pointerEvents: open ? "none" : "auto",
-          cursor: open ? "default" : "crosshair",
+          pointerEvents: pinning ? "auto" : "none",
+          cursor: pinning ? "crosshair" : "default",
+          background: pinning ? "rgba(165, 180, 252, 0.05)" : "transparent",
+          transition: "background 200ms",
         }}
       />
 
-      {/* Render existing pins (only the active ones, by lifetimeSec window) */}
+      {/* Pines visibles cuando playhead está cerca de su atSec */}
       {myComments
         .filter((c) => c.posX !== undefined && c.posY !== undefined && isActive(c))
         .map((c) => (
@@ -199,8 +189,21 @@ export const CommentsPanel: React.FC<Props> = ({
                 border: `${px(1)}px solid rgba(255,255,255,0.5)`,
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: px(8), alignItems: "center" }}>
-                <span style={{ fontSize: px(10), opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: px(8),
+                  alignItems: "center",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: px(10),
+                    opacity: 0.7,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
                   ⏺ {formatTime(c.atSec)}
                 </span>
                 <button
@@ -223,7 +226,6 @@ export const CommentsPanel: React.FC<Props> = ({
               </div>
               <div style={{ marginTop: px(2), lineHeight: 1.35 }}>{c.text}</div>
             </div>
-            {/* Pin tip pointer */}
             <div
               style={{
                 width: px(14),
@@ -236,7 +238,6 @@ export const CommentsPanel: React.FC<Props> = ({
                 borderLeft: "none",
               }}
             />
-            {/* Anchor dot */}
             <div
               style={{
                 width: px(10),
@@ -251,50 +252,70 @@ export const CommentsPanel: React.FC<Props> = ({
           </div>
         ))}
 
-      {/* Floating "click or press C" indicator */}
+      {/* Indicator: cambia de "📍 add comment" a "click anywhere" en modo pinning */}
       <div
+        onClick={() => {
+          if (pinning) {
+            setPinning(false);
+          } else {
+            setPinning(true);
+          }
+        }}
         style={{
           position: "absolute",
           top: px(32),
           right: px(32),
-          background: "rgba(15, 17, 20, 0.85)",
+          background: pinning
+            ? "rgba(165, 180, 252, 0.95)"
+            : "rgba(15, 17, 20, 0.85)",
           backdropFilter: "blur(40px)",
-          border: `${px(1)}px solid rgba(232, 199, 108, 0.4)`,
+          border: `${px(1)}px solid ${
+            pinning ? "rgba(165, 180, 252, 1)" : "rgba(232, 199, 108, 0.4)"
+          }`,
           borderRadius: px(14),
           padding: `${px(14)}px ${px(20)}px`,
-          color: "#E8C76C",
+          color: pinning ? "#0F1114" : "#E8C76C",
           fontSize: px(15),
           fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
-          fontWeight: 500,
-          pointerEvents: "none",
+          fontWeight: 600,
+          pointerEvents: "auto",
+          cursor: "pointer",
           display: "flex",
           alignItems: "center",
           gap: px(12),
           boxShadow: `0 ${px(8)}px ${px(24)}px rgba(0,0,0,0.5)`,
           opacity: showIndicator ? 1 : 0,
-          transition: "opacity 400ms ease",
+          transition: "opacity 400ms ease, background 200ms, color 200ms",
         }}
       >
         <span style={{ fontSize: px(20) }}>📍</span>
-        <span>
-          {hintText}{" "}
-          <kbd
-            style={{
-              background: "rgba(0,0,0,0.4)",
-              padding: `${px(2)}px ${px(10)}px`,
-              borderRadius: px(5),
-              fontFamily: "monospace",
-              fontSize: px(13),
-              border: `${px(1)}px solid rgba(232, 199, 108, 0.3)`,
-              marginLeft: px(4),
-              textTransform: "uppercase",
-            }}
-          >
-            {shortcut}
-          </kbd>
-          {" "}@ {formatTime(atSec)}
-        </span>
-        {myComments.length > 0 && (
+        {pinning ? (
+          <span>
+            Click on the preview · {formatTime(atSec)}{" "}
+            <span style={{ fontSize: px(11), opacity: 0.6, marginLeft: px(6) }}>
+              Esc to cancel
+            </span>
+          </span>
+        ) : (
+          <span>
+            <kbd
+              style={{
+                background: "rgba(0,0,0,0.4)",
+                padding: `${px(2)}px ${px(10)}px`,
+                borderRadius: px(5),
+                fontFamily: "monospace",
+                fontSize: px(13),
+                border: `${px(1)}px solid rgba(232, 199, 108, 0.3)`,
+                marginRight: px(6),
+                textTransform: "uppercase",
+              }}
+            >
+              {shortcut}
+            </kbd>
+            comment @ {formatTime(atSec)}
+          </span>
+        )}
+        {myComments.length > 0 && !pinning && (
           <span
             style={{
               background: "rgba(165, 180, 252, 0.2)",
@@ -365,7 +386,14 @@ export const CommentsPanel: React.FC<Props> = ({
               outline: "none",
             }}
           />
-          <div style={{ display: "flex", gap: px(10), marginTop: px(14), justifyContent: "flex-end" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: px(10),
+              marginTop: px(14),
+              justifyContent: "flex-end",
+            }}
+          >
             <button
               onClick={() => setOpen(false)}
               style={{

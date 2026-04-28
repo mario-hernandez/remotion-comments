@@ -25,9 +25,14 @@
  * ```
  */
 
-export { CommentsPanel } from "./CommentsPanel";
-export { CommentSequences } from "./CommentSequences";
-export { useComments } from "./useComments";
-export type { UseCommentsResult } from "./useComments";
-export type { Comment, CommentsConfig } from "./types";
-export { DEFAULT_FILE_PATH, DEFAULT_LIFETIME_SEC } from "./types";
+export { CommentsPanel } from "./CommentsPanel.js";
+export { CommentSequences } from "./CommentSequences.js";
+export { useComments } from "./useComments.js";
+export type { UseCommentsResult } from "./useComments.js";
+export type { Comment, CommentsConfig } from "./types.js";
+export { DEFAULT_FILE_PATH, DEFAULT_LIFETIME_SEC } from "./types.js";
+
+// Side-effect import: registers the Studio sidebar panel on window.
+// Patched @remotion/studio's OptionsPanel reads from this global.
+import "./StudioPanel.js";
+export { StudioPanel } from "./StudioPanel.js";

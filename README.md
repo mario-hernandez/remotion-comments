@@ -72,11 +72,21 @@ LLM ◀───(reads JSON)─── reviewer clicks pin
 
 ```bash
 npm install remotion-comments
-# requires peer deps:
+# (peer deps you probably already have)
 npm install remotion @remotion/studio react
 ```
 
-Tested with Remotion `4.0.448+`.
+To enable the **"Comments" tab in Remotion Studio's right sidebar**, copy the bundled patch and add a `postinstall` hook so it survives `npm install`:
+
+```bash
+mkdir -p patches
+cp node_modules/remotion-comments/patches/@remotion+studio+*.patch patches/
+npm install --save-dev patch-package
+npm pkg set scripts.postinstall=patch-package
+npm install
+```
+
+Tested with Remotion `4.0.448+`. The patch is a 23-line diff to `@remotion/studio`'s compiled `OptionsPanel.js` — it adds a third tab next to *Props* and *Renders* and renders whatever component the package registers on `window.__remotionStudioPanels__.comments`. **A proper extension API for the Studio is being proposed upstream** ([issue link tbd](https://github.com/remotion-dev/remotion)). Once accepted, the patch will be deprecated.
 
 ---
 
