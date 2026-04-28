@@ -1,0 +1,63 @@
+{
+  "name": "remotion-comments",
+  "version": "0.1.0",
+  "description": "Timed comments for Remotion compositions. Click on the preview, leave feedback at exact frames, see them as native clips on the Studio timeline. Persisted in public/comments.json — readable by humans, LLMs, or CI.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "remotion",
+    "comments",
+    "feedback",
+    "annotations",
+    "review",
+    "timeline",
+    "video",
+    "llm",
+    "ai-bridge"
+  ],
+  "author": {
+    "name": "Mario Hernández",
+    "email": "developer@supera.dev",
+    "url": "https://github.com/mario-hernandez"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mario-hernandez/remotion-comments.git"
+  },
+  "homepage": "https://github.com/mario-hernandez/remotion-comments#readme",
+  "bugs": {
+    "url": "https://github.com/mario-hernandez/remotion-comments/issues"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "remotion": ">=4.0.0",
+    "@remotion/studio": ">=4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "react": "^19.2.4",
+    "remotion": "^4.0.448",
+    "@remotion/studio": "^4.0.448",
+    "typescript": "^5.9.3"
+  }
+}
