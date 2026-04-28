@@ -1,6 +1,6 @@
 {
   "name": "remotion-comments",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Timed comments for Remotion compositions. Click on the preview, leave feedback at exact frames, see them as native clips on the Studio timeline. Persisted in public/comments.json — readable by humans, LLMs, or CI.",
   "type": "module",
   "main": "./dist/index.js",
