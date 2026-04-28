@@ -119,9 +119,17 @@ export const CommentsPanel: React.FC<Props> = ({
   const submit = async () => {
     const text = formText.trim();
     if (!text) return;
-    await add({ compositionId, ...formAt, text, fps });
+    // Cerrar el form ANTES del await — así si writeStaticFile lanza,
+    // la ventana ya está cerrada. Antes (v0.1.0) un fallo del write
+    // dejaba el form abierto sin feedback al usuario.
     setFormText("");
     setOpen(false);
+    try {
+      await add({ compositionId, ...formAt, text, fps });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[remotion-comments] could not persist comment", e);
+    }
   };
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
